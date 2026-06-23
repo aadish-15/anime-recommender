@@ -1,0 +1,53 @@
+# Python
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+
+.venv/
+venv/
+env/
+
+# Jupyter
+
+.ipynb_checkpoints/
+
+# VS Code
+
+.vscode/
+
+# OS Files
+
+.DS_Store
+Thumbs.db
+
+# Environment Variables
+
+.env
+
+# Raw and Generated Data
+
+data/raw/
+data/processed/
+
+# Trained Models & Artifacts
+
+models/*.pkl
+
+# Logs
+
+*.log
+
+# Testing
+
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build
+
+dist/
+build/
+*.egg-info/
