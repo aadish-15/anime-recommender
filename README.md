@@ -1,20 +1,65 @@
 # Anime Recommender System
 
-A backend-focused anime recommendation system built with Python, machine learning, and FastAPI.
+A backend-focused anime recommendation system built with Python, machine learning, and data engineering principles.
 
-The project combines content-based filtering, collaborative filtering, and metadata enrichment to generate personalized anime recommendations.
+The project uses anime metadata, user ratings, and external enrichment from the Jikan API to generate anime recommendations through a hybrid recommendation pipeline.
 
-## Features
+---
 
-* Data ingestion and ETL pipeline
+## Current Features
+
+### Data Processing
+
+* Kaggle Anime Recommendations Database ingestion
 * Anime metadata cleaning and preprocessing
-* Content-based recommendation engine using TF-IDF and cosine similarity
-* Model artifact generation using Joblib
-* Planned Jikan API metadata enrichment
-* Planned collaborative filtering using user rating data
-* Planned hybrid recommendation system
-* FastAPI endpoints for recommendation serving
-* SQL analytics for recommendation insights
+* Genre normalization and feature preparation
+* Resumable metadata enrichment pipeline using Jikan API
+
+### Recommendation Engine
+
+* Content-based recommendation system
+* TF-IDF vectorization
+* Cosine similarity recommendation generation
+* Model artifact persistence using Joblib
+
+### Engineering Features
+
+* Modular ETL pipeline
+* Checkpointed API enrichment workflow
+* Recovery from interrupted enrichment jobs
+* Model serialization and loading
+
+---
+
+## Dataset
+
+### Kaggle Anime Recommendations Database
+
+Contains:
+
+* Anime metadata
+* User ratings
+* Genre information
+* Popularity metrics
+
+Current dataset size:
+
+* 12,294 anime entries
+* 7.8 million user ratings
+
+### Jikan API Enrichment
+
+Additional metadata:
+
+* Synopsis
+* Themes
+* Studios
+* Demographics
+* Season
+* Year
+* Score
+
+---
 
 ## Project Structure
 
@@ -22,59 +67,62 @@ The project combines content-based filtering, collaborative filtering, and metad
 anime-recommender/
 
 ├── api/
-│   └── main.py
-
+│
 ├── data/
 │   ├── raw/
 │   └── processed/
-
+│
 ├── etl/
 │   ├── load_kaggle_ratings.py
 │   ├── transform.py
 │   └── fetch_jikan.py
-
+│
 ├── models/
-│   ├── content_based.py
-│   ├── collaborative.py
-│   └── train.py
-
+│   ├── train.py
+│   └── content_based.py
+│
 ├── notebooks/
-│   └── eda.ipynb
-
+│
 ├── sql/
-│   └── analytics_queries.sql
-
+│
+├── README.md
 ├── requirements.txt
-├── .gitignore
-└── README.md
+└── .gitignore
 ```
 
-## Dataset
+---
 
-This project uses the Anime Recommendations Database dataset from Kaggle.
+## Recommendation Pipeline
 
-Dataset contents:
+```text
+Anime Dataset
+      ↓
+Data Cleaning
+      ↓
+Metadata Enrichment (Jikan)
+      ↓
+Feature Engineering
+      ↓
+TF-IDF Vectorization
+      ↓
+Cosine Similarity Matrix
+      ↓
+Top-N Recommendations
+```
 
-* anime.csv
-* rating.csv
+---
 
-Statistics:
+## Current Recommendation Method
 
-* 12,294 anime entries
-* 7.8 million user ratings
+The current version uses:
 
-## Current Pipeline
+* Genre metadata
+* TF-IDF feature extraction
+* Cosine similarity
 
-1. Load anime and ratings datasets
-2. Clean and normalize metadata
-3. Generate TF-IDF feature vectors
-4. Compute cosine similarity matrix
-5. Save model artifacts using Joblib
-6. Serve recommendations through API endpoints
+to recommend anime with similar content profiles.
 
-## Example Recommendation
-
-Input:
+Example:
 
 ```python
 recommend("Death Note")
@@ -84,11 +132,12 @@ Output:
 
 ```text
 Monster
-Higurashi no Naku Koro ni
-Mirai Nikki
 Psycho-Pass
+Code Geass
 ...
 ```
+
+---
 
 ## Tech Stack
 
@@ -96,23 +145,27 @@ Psycho-Pass
 * Pandas
 * NumPy
 * Scikit-Learn
-* FastAPI
+* Requests
 * Joblib
+* FastAPI (planned)
+
+---
 
 ## Roadmap
 
 ### Completed
 
 * Dataset ingestion
-* ETL pipeline
 * Metadata cleaning
 * TF-IDF feature generation
 * Content-based recommendation engine
 * Model artifact persistence
+* Resumable Jikan enrichment pipeline
 
 ### In Progress
 
-* Jikan API metadata enrichment
+* Full metadata enrichment
+* Feature engineering using synopsis, themes, studios, and demographics
 
 ### Planned
 
@@ -121,9 +174,10 @@ Psycho-Pass
 * FastAPI recommendation endpoints
 * SQL analytics layer
 * Docker deployment
-* Automated retraining pipeline
 
-## Running Locally
+---
+
+## Running the Project
 
 Install dependencies:
 
@@ -131,17 +185,35 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Run model training:
+Train recommendation artifacts:
 
 ```bash
 python models/train.py
 ```
 
-Run content recommender:
+Run recommendation engine:
 
 ```bash
 python models/content_based.py
 ```
+
+Run metadata enrichment:
+
+```bash
+python etl/fetch_jikan.py
+```
+
+---
+
+## Future Improvements
+
+* Hybrid recommendation architecture
+* Similarity search optimization
+* Automated retraining workflows
+* Recommendation quality evaluation
+* API deployment and monitoring
+
+---
 
 ## Author
 
