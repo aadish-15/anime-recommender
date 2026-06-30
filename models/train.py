@@ -5,14 +5,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-df = pd.read_csv("data/processed/anime_clean.csv")
+df = pd.read_csv("data/processed/anime_features.csv")
 
 vectorizer = TfidfVectorizer(
     stop_words="english"
 )
 
 tfidf_matrix = vectorizer.fit_transform(
-    df["genre_clean"]
+    df["feature_text"]
 )
 
 similarity_matrix = cosine_similarity(

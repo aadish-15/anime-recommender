@@ -1,67 +1,61 @@
 # Anime Recommender System
 
-A backend-focused anime recommendation system built with Python, machine learning, and data engineering principles.
+A backend-focused anime recommendation system built with Python, machine learning, and modern data engineering practices.
 
-The project uses anime metadata, user ratings, and external enrichment from the Jikan API to generate anime recommendations through a hybrid recommendation pipeline.
+The project combines structured anime metadata, user ratings, and external metadata enrichment from the Jikan API to build a scalable recommendation pipeline.
 
 ---
 
-## Current Features
+# Features
 
-### Data Processing
+## ETL Pipeline
 
 * Kaggle Anime Recommendations Database ingestion
-* Anime metadata cleaning and preprocessing
-* Genre normalization and feature preparation
-* Resumable metadata enrichment pipeline using Jikan API
-
-### Recommendation Engine
-
-* Content-based recommendation system
-* TF-IDF vectorization
-* Cosine similarity recommendation generation
-* Model artifact persistence using Joblib
-
-### Engineering Features
-
-* Modular ETL pipeline
-* Checkpointed API enrichment workflow
-* Recovery from interrupted enrichment jobs
-* Model serialization and loading
+* Metadata cleaning and normalization
+* Genre preprocessing
+* Resumable Jikan API enrichment
+* Automatic checkpointing and recovery
+* Retry handling for transient API failures
 
 ---
 
-## Dataset
+## Feature Engineering
 
-### Kaggle Anime Recommendations Database
+* Merge Kaggle and Jikan datasets
 
-Contains:
+* Generate unified `feature_text`
 
-* Anime metadata
-* User ratings
-* Genre information
-* Popularity metrics
+* Combine:
 
-Current dataset size:
+  * Genres
+  * Themes
+  * Studios
+  * Demographics
+  * Synopsis
 
-* 12,294 anime entries
-* 7.8 million user ratings
+* Ready for downstream machine learning models
 
-### Jikan API Enrichment
+---
 
-Additional metadata:
+## Recommendation Engine
 
-* Synopsis
+Current recommendation model:
+
+* TF-IDF Vectorization
+* Cosine Similarity
+* Joblib model persistence
+
+Current recommendation features include:
+
+* Genres
 * Themes
 * Studios
 * Demographics
-* Season
-* Year
-* Score
+* Synopsis
 
 ---
 
-## Project Structure
+# Project Structure
 
 ```text
 anime-recommender/
@@ -75,7 +69,8 @@ anime-recommender/
 ├── etl/
 │   ├── load_kaggle_ratings.py
 │   ├── transform.py
-│   └── fetch_jikan.py
+│   ├── fetch_jikan.py
+│   └── build_features.py
 │
 ├── models/
 │   ├── train.py
@@ -92,54 +87,78 @@ anime-recommender/
 
 ---
 
-## Recommendation Pipeline
+# Data Pipeline
 
 ```text
-Anime Dataset
-      ↓
-Data Cleaning
-      ↓
-Metadata Enrichment (Jikan)
-      ↓
+Kaggle Dataset
+        │
+        ▼
+Cleaning & Transformation
+        │
+        ▼
+Jikan Metadata Enrichment
+        │
+        ▼
 Feature Engineering
-      ↓
+        │
+        ▼
 TF-IDF Vectorization
-      ↓
-Cosine Similarity Matrix
-      ↓
+        │
+        ▼
+Cosine Similarity
+        │
+        ▼
 Top-N Recommendations
 ```
 
 ---
 
-## Current Recommendation Method
+# Datasets
 
-The current version uses:
+## Kaggle
 
-* Genre metadata
-* TF-IDF feature extraction
-* Cosine similarity
+* 12,294 anime
+* 7.8 million user ratings
 
-to recommend anime with similar content profiles.
+Provides:
 
-Example:
-
-```python
-recommend("Death Note")
-```
-
-Output:
-
-```text
-Monster
-Psycho-Pass
-Code Geass
-...
-```
+* Genres
+* Episodes
+* Type
+* Rating
+* Popularity
 
 ---
 
-## Tech Stack
+## Jikan API
+
+Provides additional metadata:
+
+* Synopsis
+* Themes
+* Studios
+* Demographics
+* Season
+* Year
+* Score
+
+---
+
+# Current Workflow
+
+1. Load Kaggle dataset
+2. Clean metadata
+3. Enrich records using Jikan
+4. Merge datasets
+5. Build feature vectors
+6. Train TF-IDF model
+7. Compute cosine similarity
+8. Save model artifacts
+9. Generate recommendations
+
+---
+
+# Technologies
 
 * Python
 * Pandas
@@ -147,74 +166,78 @@ Code Geass
 * Scikit-Learn
 * Requests
 * Joblib
-* FastAPI (planned)
+* FastAPI *(planned)*
 
 ---
 
-## Roadmap
+# Running
 
-### Completed
-
-* Dataset ingestion
-* Metadata cleaning
-* TF-IDF feature generation
-* Content-based recommendation engine
-* Model artifact persistence
-* Resumable Jikan enrichment pipeline
-
-### In Progress
-
-* Full metadata enrichment
-* Feature engineering using synopsis, themes, studios, and demographics
-
-### Planned
-
-* Collaborative filtering
-* Hybrid recommendation system
-* FastAPI recommendation endpoints
-* SQL analytics layer
-* Docker deployment
-
----
-
-## Running the Project
-
-Install dependencies:
+Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Train recommendation artifacts:
+Run ETL
+
+```bash
+python etl/load_kaggle_ratings.py
+python etl/transform.py
+python etl/fetch_jikan.py
+python etl/build_features.py
+```
+
+Train recommendation model
 
 ```bash
 python models/train.py
 ```
 
-Run recommendation engine:
+Run recommender
 
 ```bash
 python models/content_based.py
 ```
 
-Run metadata enrichment:
+---
 
-```bash
-python etl/fetch_jikan.py
-```
+# Roadmap
+
+## Completed
+
+* Dataset ingestion
+* ETL pipeline
+* Metadata cleaning
+* TF-IDF recommendation engine
+* Model persistence
+* Resumable Jikan enrichment
+* Feature engineering pipeline
+
+## In Progress
+
+* Full Jikan enrichment (12k+ anime)
+
+## Planned
+
+* Collaborative filtering
+* Hybrid recommendation engine
+* FastAPI REST API
+* SQL analytics
+* Docker deployment
+* Recommendation evaluation metrics
 
 ---
 
-## Future Improvements
+# Engineering Highlights
 
-* Hybrid recommendation architecture
-* Similarity search optimization
-* Automated retraining workflows
-* Recommendation quality evaluation
-* API deployment and monitoring
+* Modular ETL architecture
+* Checkpoint-based data ingestion
+* Resume support after interruption
+* Model artifact persistence
+* Decoupled training and inference
+* Feature engineering pipeline
+* Backend-oriented project structure
 
 ---
 
-## Author
-
-Built as a machine learning and backend engineering portfolio project focused on recommendation systems, data processing, and model deployment by Aadish Tamaskar.
+Built as a portfolio project demonstrating machine learning engineering, backend development, ETL pipelines, recommendation systems, and production-oriented Python workflows by Aadish Tamaskar
