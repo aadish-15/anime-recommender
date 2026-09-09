@@ -1,7 +1,9 @@
 from pathlib import Path
 import os
+import random
 import time
 from datetime import datetime, timezone
+
 import pandas as pd
 import requests
 from tqdm import tqdm
@@ -41,12 +43,23 @@ FAILURE_FILE = (
 
 BASE_URL = "https://api.jikan.moe/v4/anime"
 
-REQUEST_TIMEOUT = 20
+# Increased from 20 seconds.
+REQUEST_TIMEOUT = 30
 
-# Conservative delay between requests.
-REQUEST_DELAY = 1.25
+# Slightly slower request rate to be friendlier to Jikan.
+REQUEST_DELAY = 1.5
+
 MAX_RETRIES = 5
+
 BACKOFF_FACTOR = 2
+
+# Prevent exponential retries from growing indefinitely.
+MAX_BACKOFF = 60
+
+# Random jitter prevents retries from happening at
+# predictable intervals.
+JITTER_MIN = 0.5
+JITTER_MAX = 2.5
 
 # Save progress after this many attempted anime,
 # not merely successful requests.
@@ -64,6 +77,14 @@ RETRYABLE_STATUS_CODES = {
     504
 }
 
+# Gateway/server errors where resetting the HTTP session
+# may help avoid reusing a problematic pooled connection.
+SESSION_RESET_STATUS_CODES = {
+    502,
+    503,
+    504
+}
+
 # Responses that normally indicate there is no point
 # repeatedly requesting the same anime ID.
 PERMANENT_STATUS_CODES = {
@@ -73,19 +94,48 @@ PERMANENT_STATUS_CODES = {
 
 
 # ---------------------------------------------------------
-# Session
+# Session handling
 # ---------------------------------------------------------
 
-session = requests.Session()
+def create_session():
+    """
+    Create a fresh HTTP session.
 
-session.headers.update(
-    {
-        "User-Agent": (
-            "Anime-Recommender-ETL/1.0"
-        ),
-        "Accept": "application/json"
-    }
-)
+    A dedicated function makes it possible to discard
+    a potentially problematic pooled connection after
+    gateway errors such as 502/503/504.
+    """
+
+    new_session = requests.Session()
+
+    new_session.headers.update(
+        {
+            "User-Agent": (
+                "Anime-Recommender-ETL/1.0"
+            ),
+            "Accept": "application/json"
+        }
+    )
+
+    return new_session
+
+
+session = create_session()
+
+
+def reset_session():
+    """
+    Close the current HTTP session and create a new one.
+    """
+
+    global session
+
+    try:
+        session.close()
+    except Exception:
+        pass
+
+    session = create_session()
 
 
 # ---------------------------------------------------------
@@ -109,7 +159,6 @@ def clean_text(value):
 
 def join_names(items):
 
-
     if not isinstance(items, list):
         return ""
 
@@ -123,6 +172,7 @@ def join_names(items):
         name = item.get("name")
 
         if name:
+
             names.append(
                 str(name).strip()
             )
@@ -162,6 +212,167 @@ def atomic_write_csv(
 
 
 # ---------------------------------------------------------
+# Retry helpers
+# ---------------------------------------------------------
+
+def calculate_backoff(attempt):
+    """
+    Exponential backoff with random jitter.
+
+    Examples will roughly be:
+
+        attempt 1 -> 2.5 - 4.5 sec
+        attempt 2 -> 4.5 - 6.5 sec
+        attempt 3 -> 8.5 - 10.5 sec
+        attempt 4 -> 16.5 - 18.5 sec
+        attempt 5 -> 32.5 - 34.5 sec
+
+    The result is capped at MAX_BACKOFF.
+    """
+
+    base_delay = (
+        BACKOFF_FACTOR ** attempt
+    )
+
+    jitter = random.uniform(
+        JITTER_MIN,
+        JITTER_MAX
+    )
+
+    return min(
+        MAX_BACKOFF,
+        base_delay + jitter
+    )
+
+
+def get_retry_delay(
+    response,
+    attempt
+):
+    """
+    Prefer Jikan's Retry-After header when available.
+
+    Otherwise use exponential backoff with jitter.
+    """
+
+    retry_after = response.headers.get(
+        "Retry-After"
+    )
+
+    if retry_after:
+
+        try:
+
+            retry_after_value = float(
+                retry_after
+            )
+
+            if retry_after_value >= 0:
+                return retry_after_value
+
+        except ValueError:
+            pass
+
+    return calculate_backoff(
+        attempt
+    )
+
+
+def print_response_diagnostics(
+    response,
+    anime_id
+):
+    """
+    Print useful information about failed HTTP responses.
+
+    This is especially helpful for identifying whether
+    502/503/504 responses are originating from Jikan,
+    Cloudflare, nginx, or another upstream component.
+    """
+
+    print(
+        "\n--- HTTP diagnostic ---"
+    )
+
+    print(
+        f"Anime ID: {anime_id}"
+    )
+
+    print(
+        f"Status: {response.status_code}"
+    )
+
+    print(
+        f"URL: {response.url}"
+    )
+
+    interesting_headers = [
+        "Server",
+        "Retry-After",
+        "CF-Ray",
+        "CF-Cache-Status",
+        "Content-Type",
+        "Via"
+    ]
+
+    print(
+        "Relevant response headers:"
+    )
+
+    found_header = False
+
+    for header in interesting_headers:
+
+        value = response.headers.get(
+            header
+        )
+
+        if value is not None:
+
+            print(
+                f"  {header}: {value}"
+            )
+
+            found_header = True
+
+    if not found_header:
+
+        print(
+            "  No diagnostic headers found."
+        )
+
+    try:
+
+        body_preview = (
+            response.text[:500]
+            .replace("\n", " ")
+            .strip()
+        )
+
+    except Exception:
+
+        body_preview = (
+            "<unable to read response body>"
+        )
+
+    if body_preview:
+
+        print(
+            f"Body: {body_preview}"
+        )
+
+    else:
+
+        print(
+            "Body: <empty>"
+        )
+
+    print(
+        "-----------------------"
+    )
+
+
+# ---------------------------------------------------------
 # Existing checkpoint loading
 # ---------------------------------------------------------
 
@@ -181,6 +392,7 @@ def load_existing_successes():
         return df
 
     if "anime_id" not in df.columns:
+
         raise ValueError(
             f"{OUTPUT_FILE.name} does not contain "
             "an anime_id column."
@@ -228,6 +440,7 @@ def load_existing_failures():
         return df
 
     if "anime_id" not in df.columns:
+
         raise ValueError(
             f"{FAILURE_FILE.name} does not contain "
             "an anime_id column."
@@ -295,13 +508,17 @@ def parse_jikan_response(
     """
 
     if not isinstance(payload, dict):
+
         raise ValueError(
             "Response body is not a JSON object."
         )
 
-    data = payload.get("data")
+    data = payload.get(
+        "data"
+    )
 
     if not isinstance(data, dict):
+
         raise ValueError(
             "Response does not contain a valid "
             "'data' object."
@@ -348,29 +565,6 @@ def parse_jikan_response(
 # Request logic
 # ---------------------------------------------------------
 
-def get_retry_delay(
-    response,
-    attempt
-):
-
-    retry_after = response.headers.get(
-        "Retry-After"
-    )
-
-    if retry_after:
-
-        try:
-            return max(
-                float(retry_after),
-                0
-            )
-
-        except ValueError:
-            pass
-
-    return BACKOFF_FACTOR ** attempt
-
-
 def fetch_jikan_metadata(
     anime_id
 ):
@@ -383,6 +577,13 @@ def fetch_jikan_metadata(
         (result, failure)
 
     Exactly one will normally contain a value.
+
+    Retry behavior:
+    - Network errors are retried.
+    - 408/425/429/5xx responses are retried.
+    - 502/503/504 also reset the HTTP session.
+    - Backoff includes random jitter.
+    - 400/404 are considered permanent failures.
     """
 
     url = (
@@ -403,10 +604,14 @@ def fetch_jikan_metadata(
 
         except requests.exceptions.RequestException as exc:
 
+            # A transport/network failure may also leave
+            # the pooled connection in a bad state.
+            reset_session()
+
             if attempt < MAX_RETRIES:
 
-                wait_time = (
-                    BACKOFF_FACTOR ** attempt
+                wait_time = calculate_backoff(
+                    attempt
                 )
 
                 print(
@@ -460,8 +665,8 @@ def fetch_jikan_metadata(
 
                 if attempt < MAX_RETRIES:
 
-                    wait_time = (
-                        BACKOFF_FACTOR ** attempt
+                    wait_time = calculate_backoff(
+                        attempt
                     )
 
                     print(
@@ -498,6 +703,25 @@ def fetch_jikan_metadata(
             response.status_code
             in RETRYABLE_STATUS_CODES
         ):
+
+            print_response_diagnostics(
+                response,
+                anime_id
+            )
+
+            # For gateway errors, discard the current
+            # pooled HTTP connection before retrying.
+            if (
+                response.status_code
+                in SESSION_RESET_STATUS_CODES
+            ):
+
+                print(
+                    f"Resetting HTTP session after "
+                    f"HTTP {response.status_code}..."
+                )
+
+                reset_session()
 
             if attempt < MAX_RETRIES:
 
@@ -543,6 +767,11 @@ def fetch_jikan_metadata(
             in PERMANENT_STATUS_CODES
         ):
 
+            print_response_diagnostics(
+                response,
+                anime_id
+            )
+
             return (
                 None,
                 make_failure_record(
@@ -561,6 +790,11 @@ def fetch_jikan_metadata(
         # -------------------------------------------------
         # Unexpected HTTP response
         # -------------------------------------------------
+
+        print_response_diagnostics(
+            response,
+            anime_id
+        )
 
         return (
             None,
@@ -682,6 +916,7 @@ def remove_resolved_failures(
         failure_df.empty
         or not successful_ids
     ):
+
         return failure_df
 
     return (
@@ -783,11 +1018,15 @@ def main():
         load_existing_failures()
     )
 
-    successful_ids = set(
-        existing_successes[
-            "anime_id"
-        ].tolist()
-    ) if not existing_successes.empty else set()
+    successful_ids = (
+        set(
+            existing_successes[
+                "anime_id"
+            ].tolist()
+        )
+        if not existing_successes.empty
+        else set()
+    )
 
     # Permanent failures are skipped on future runs.
     # Retryable failures are intentionally attempted again.
@@ -999,6 +1238,11 @@ def main():
             f"Failure records: "
             f"{len(existing_failures):,}"
         )
+
+        try:
+            session.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
